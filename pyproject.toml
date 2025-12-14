@@ -13,6 +13,7 @@ django-cors-headers = "^4.9.0"
 python-dotenv = "^1.2.1"
 django-unfold = "^0.73.1"
 markdown = "^3.10"
+mysqlclient = "^2.2.7"
 
 
 [build-system]
