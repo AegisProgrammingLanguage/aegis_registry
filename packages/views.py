@@ -1,61 +1,102 @@
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Package, PackageVersion
-from .serializers import PackageSerializer, VersionSerializer
-from django.http import HttpRequest
-from typing import Optional
+from typing import Any, Dict, Optional
+from django.views.generic import TemplateView, ListView, DetailView
+from django.db.models import QuerySet, Q
+from django.shortcuts import get_object_or_404
+
+from .models import Package
+from .services import PackageService
 
 
-class PackageViewSet(viewsets.ModelViewSet):
-    queryset = Package.objects.all()
-    serializer_class = PackageSerializer
-    lookup_field = 'name'
+class IndexView(TemplateView):
+    template_name: str = "index.html"
 
-    parser_classes = (MultiPartParser, FormParser)
-
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticatedOrReadOnly])
-    def publish(self, request: HttpRequest, name: Optional[str] = None) -> Response:
-        package: Package = self.get_object()
-
-        # Check ownership
-        if package.author != request.user:
-            return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Populates the context for the homepage.
+        """
+        context: Dict[str, Any] = super().get_context_data(**kwargs)
         
-        version_num = request.data.get("version")
-        archive_file = request.data.get("file")
-
-        if not version_num or not archive_file:
-            return Response({
-                "error": "Version and file required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Use Service to get data (clean separation of concerns)
+        context['recent_packages'] = PackageService.get_recent_packages(limit=6)
+        context['total_packages'] = Package.objects.count()
+        context['total_downloads'] = PackageService.get_total_downloads()
         
-        # Create Version
-        if PackageVersion.objects.filter(package=package, version_number=version_num).exists():
-            return Response({
-                "error": "Version already exists"
-            }, status=status.HTTP_409_CONFLICT)
-        
-        PackageVersion.objects.create(
-            package=package,
-            version_number=version_num,
-            archive=archive_file
-        )
+        return context
 
-        return Response({
-            "status": "Published!"
-        }, status=status.HTTP_201_CREATED)
+
+class PackageListView(ListView):
+    model = Package
+    template_name: str = "packages/list.html"
+    context_object_name: str = "packages"
+    paginate_by: int = 10  # Optional: Adds pagination automatically
+
+    def get_queryset(self) -> QuerySet[Package]:
+        """
+        Handles filtering (search) and sorting logic.
+        """
+        queryset: QuerySet[Package] = super().get_queryset()
+        
+        # 1. Search Logic
+        query: Optional[str] = self.request.GET.get('q')
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query) | 
+                Q(description__icontains=query)
+            )
+
+        # 2. Sort Logic
+        sort_param: Optional[str] = self.request.GET.get('sort')
+        if sort_param == 'downloads':
+            queryset = queryset.order_by('-download_count')
+        elif sort_param == 'name':
+            queryset = queryset.order_by('name')
+        else:
+            # Default: Recently updated
+            queryset = queryset.order_by('-updated_at')
+
+        return queryset
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Injects extra context, like the current search query to keep it in the input field.
+        """
+        context: Dict[str, Any] = super().get_context_data(**kwargs)
+        context['current_query'] = self.request.GET.get('q', '')
+        context['current_sort'] = self.request.GET.get('sort', 'updated')
+        return context
+
+
+class PackageDetailView(DetailView):
+    model = Package
+    template_name: str = "packages/detail.html"
+    context_object_name: str = "package"
     
-    # Endpoint custom pour récupérer la dernière version directement
-    @action(detail=True, methods=["get"])
-    def latest(self, request: HttpRequest, name: Optional[str] = None) -> Response:
-        package: Package = self.get_object()
-        latest: PackageVersion = package.versions.order_by('-created_at').first()
-        if not latest:
-            return Response({"error": "No versions found"}, status=404)
+    # Configuration to look up by 'name' instead of 'pk'
+    slug_field: str = "name"
+    slug_url_kwarg: str = "name"
+
+    def get_object(self, queryset: Optional[QuerySet[Package]] = None) -> Package:
+        """
+        Override to ensure we fetch by name efficiently.
+        """
+        if queryset is None:
+            queryset = self.get_queryset()
+            
+        name: str = self.kwargs.get(self.slug_url_kwarg)
+        # Using select_related/prefetch_related optimization is good practice here
+        # assuming 'versions' is a related model
+        return get_object_or_404(queryset.prefetch_related('versions'), name=name)
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Render the markdown README before sending to template.
+        """
+        context: Dict[str, Any] = super().get_context_data(**kwargs)
+        package: Package = self.object  # type: ignore (DetailView defines self.object)
         
-        return Response({
-            "version": latest.version_number,
-            "url": request.build_absolute_uri(latest.archive.url)
-        })
+        # Render markdown using the service
+        if hasattr(package, 'readme'):
+            context['readme_html'] = PackageService.render_markdown(package.readme)
+            
+        return context
+    

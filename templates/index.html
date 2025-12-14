@@ -1,0 +1,51 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="text-center py-16">
+    <h1 class="text-5xl font-extrabold text-slate-900 mb-6">
+        The Package Registry for <span class="text-aegis-600">Aegis</span>
+    </h1>
+    <p class="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
+        Discover, install, and publish packages for the Aegis programming language.
+        Join the community and build faster.
+    </p>
+
+    <div class="max-w-xl mx-auto mb-16">
+        <form action="{% url 'package_list' %}" method="get" class="relative">
+            <input type="text" name="q" placeholder="Search packages (e.g. glfw, http...)" 
+                   class="w-full px-6 py-4 rounded-full border-2 border-slate-200 focus:border-aegis-500 focus:outline-none text-lg shadow-sm">
+            <button type="submit" class="absolute right-2 top-2 bg-aegis-600 text-white p-2 rounded-full hover:bg-aegis-500 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-4xl mx-auto">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div class="text-aegis-600 font-bold text-4xl mb-2">{{ total_packages }}</div>
+            <div class="text-slate-500 font-medium">Packages Published</div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div class="text-aegis-600 font-bold text-4xl mb-2">{{ total_downloads }}</div>
+            <div class="text-slate-500 font-medium">Total Downloads</div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div class="text-aegis-600 font-bold text-4xl mb-2">v2.0</div>
+            <div class="text-slate-500 font-medium">Latest Aegis Version</div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-12">
+    <h2 class="text-2xl font-bold mb-6 text-slate-800">Recently Updated</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for pkg in recent_packages %}
+            {% include 'partials/package_card.html' with pkg=pkg %}
+        {% empty %}
+            <p class="text-slate-500">No packages found.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

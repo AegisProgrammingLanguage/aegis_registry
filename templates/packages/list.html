@@ -1,0 +1,67 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="flex flex-col md:flex-row gap-8">
+    <aside class="w-full md:w-64 flex-shrink-0">
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+            <h3 class="font-bold text-lg mb-4">Filters</h3>
+            <form method="get">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Search</label>
+                    <input type="text" name="q" value="{{ request.GET.q }}" class="w-full border rounded p-2 text-sm">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Sort by</label>
+                    <select name="sort" class="w-full border rounded p-2 text-sm">
+                        <option value="updated">Recently Updated</option>
+                        <option value="downloads">Most Downloads</option>
+                        <option value="name">Name (A-Z)</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-slate-800">
+                    Apply Filters
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="flex-grow">
+        <h2 class="text-2xl font-bold mb-6">
+            {% if request.GET.q %}
+                Results for "{{ request.GET.q }}"
+            {% else %}
+                All Packages
+            {% endif %}
+        </h2>
+
+        <div class="space-y-4">
+            {% for pkg in packages %}
+                <a href="{% url 'package_detail' pkg.name %}" class="block bg-white p-6 rounded-lg shadow-sm border border-slate-200 hover:border-aegis-500 transition group">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-bold text-aegis-700 group-hover:text-aegis-500">{{ pkg.name }}</h3>
+                            <p class="text-slate-600 mt-1">{{ pkg.description|truncatechars:120 }}</p>
+                        </div>
+                        <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">v{{ pkg.latest_version }}</span>
+                    </div>
+                    <div class="mt-4 flex items-center gap-4 text-sm text-slate-500">
+                        <span class="flex items-center gap-1">
+                            👤 {{ pkg.author }}
+                        </span>
+                        <span class="flex items-center gap-1">
+                            ⬇️ {{ pkg.download_count }}
+                        </span>
+                        <span class="flex items-center gap-1">
+                            🕒 {{ pkg.last_updated|timesince }} ago
+                        </span>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="text-center py-12 text-slate-500">
+                    No packages found matching your criteria.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

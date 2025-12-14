@@ -1,0 +1,132 @@
+{% extends 'layout.html' %}
+
+{% block title %}My Profile - Aegis Registry{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    
+    <div class="mb-8 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900">Dashboard</h1>
+            <p class="text-slate-500">Manage your credentials and packages</p>
+        </div>
+        <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm">
+            <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+            <span class="text-sm font-medium text-slate-700">{{ user.username }}</span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <div class="md:col-span-1 space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="font-bold text-lg text-slate-900 mb-4 flex items-center gap-2">
+                    🔑 API Token
+                </h2>
+                <p class="text-xs text-slate-500 mb-4">
+                    Use this token to publish packages via the CLI.
+                    <br>
+                    <code class="text-aegis-600 bg-aegis-50 px-1 rounded">aegis login &lt;token&gt;</code>
+                </p>
+
+                <div class="relative mb-4">
+                    <input type="password" id="apiToken" value="{{ api_token }}" readonly
+                           class="w-full bg-slate-50 border border-slate-200 rounded-lg py-3 px-3 text-sm font-mono text-slate-600 focus:outline-none focus:ring-2 focus:ring-aegis-500">
+                    
+                    <button onclick="toggleToken()" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600" title="Show/Hide">
+                        👁️
+                    </button>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button onclick="copyToken()" class="w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition flex justify-center items-center gap-2">
+                        📋 Copy Token
+                    </button>
+
+                    <form method="post" onsubmit="return confirm('Are you sure? The old token will stop working immediately.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="regenerate_token" value="true">
+                        <button type="submit" class="w-full text-red-600 bg-red-50 border border-red-100 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition">
+                            🔄 Regenerate
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                <h3 class="font-bold text-indigo-900 mb-2">Documentation</h3>
+                <p class="text-sm text-indigo-700 mb-4">Learn how to create, test and publish your first package.</p>
+                <a href="https://aegisprogramminglanguage.github.io/AegisProgrammingLanguage/index.html" target="_blank" ="text-indigo-600 font-bold text-sm hover:underline">Read the docs &rarr;</a>
+            </div>
+        </div>
+
+        <div class="md:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="font-bold text-lg text-slate-900">📦 My Packages</h2>
+                    <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{{ my_packages.count }} total</span>
+                </div>
+
+                {% if my_packages %}
+                    <div class="divide-y divide-slate-100">
+                        {% for pkg in my_packages %}
+                        <div class="p-6 hover:bg-slate-50 transition flex justify-between items-center group">
+                            <div>
+                                <div class="flex items-center gap-3">
+                                    <a href="{% url 'package_detail' pkg.name %}" class="font-bold text-lg text-slate-800 hover:text-aegis-600">
+                                        {{ pkg.name }}
+                                    </a>
+                                    {% if pkg.latest_version %}
+                                        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">v{{ pkg.latest_version }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-sm text-slate-500 mt-1 flex gap-4">
+                                    <span>⬇️ {{ pkg.download_count }} downloads</span>
+                                    <span>🕒 Updated {{ pkg.updated_at|timesince }} ago</span>
+                                </div>
+                            </div>
+                            <a href="{% url 'package_detail' pkg.name %}" class="text-slate-400 group-hover:text-aegis-500">
+                                →
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="p-12 text-center text-slate-500">
+                        <p class="mb-4">You haven't published any packages yet.</p>
+                        <div class="bg-slate-50 p-4 rounded-lg inline-block text-left text-sm font-mono text-slate-600">
+                            $ aegis new my_package<br>
+                            $ cd my_package<br>
+                            $ aegis publish
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleToken() {
+        const input = document.getElementById('apiToken');
+        if (input.type === "password") {
+            input.type = "text";
+        } else {
+            input.type = "password";
+        }
+    }
+
+    function copyToken() {
+        const input = document.getElementById('apiToken');
+        // Nécessaire pour copier même si caché
+        const type = input.type;
+        input.type = "text";
+        input.select();
+        input.setSelectionRange(0, 99999); 
+        navigator.clipboard.writeText(input.value).then(() => {
+            alert("Token copied to clipboard!");
+        });
+        input.type = type;
+    }
+</script>
+{% endblock %}

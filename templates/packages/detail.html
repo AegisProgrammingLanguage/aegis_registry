@@ -1,0 +1,83 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ package.name }} - Aegis Registry{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+    <div class="p-8 bg-slate-50 border-b border-slate-200">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">{{ package.name }}</h1>
+                <p class="text-slate-600 mt-2 text-lg">{{ package.description }}</p>
+                <div class="flex items-center gap-2 mt-4 text-sm">
+                    <span class="px-2 py-1 bg-aegis-100 text-aegis-700 rounded-md font-medium">v{{ package.latest_version }}</span>
+                    <span class="text-slate-400">|</span>
+                    <a href="#" class="text-aegis-600 hover:underline">{{ package.author }}</a>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-auto">
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Install</div>
+                <div class="flex items-center bg-slate-900 rounded-lg overflow-hidden shadow-md">
+                    <code class="px-4 py-3 text-green-400 font-mono text-sm">aegis add {{ package.name }}</code>
+                    <button onclick="navigator.clipboard.writeText('aegis add {{ package.name }}')" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-3 border-l border-slate-700 transition" title="Copy to clipboard">
+                        📋
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4">
+        <div class="lg:col-span-3 p-8 border-r border-slate-200 min-h-[400px]">
+            <h2 class="text-xl font-bold mb-4 border-b pb-2">README</h2>
+            <div class="prose max-w-none text-slate-700">
+                {% if package.readme %}
+                    {{ package.readme|linebreaks }}
+                {% else %}
+                    <p class="italic text-slate-400">No README provided for this package.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 p-6 bg-slate-50">
+            <h3 class="font-bold text-slate-900 mb-4">Metadata</h3>
+            
+            <ul class="space-y-4 text-sm">
+                <li>
+                    <span class="block text-slate-500 text-xs">License</span>
+                    <span class="font-medium">{{ package.license|default:"MIT" }}</span>
+                </li>
+                <li>
+                    <span class="block text-slate-500 text-xs">Repository</span>
+                    {% if package.repository %}
+                        <a href="{{ package.repository }}" class="text-aegis-600 hover:underline break-all">{{ package.repository }}</a>
+                    {% else %}
+                        <span class="text-slate-400">-</span>
+                    {% endif %}
+                </li>
+                <li>
+                    <span class="block text-slate-500 text-xs">Downloads</span>
+                    <span class="font-medium">{{ package.download_count }}</span>
+                </li>
+                <li>
+                    <span class="block text-slate-500 text-xs">Published</span>
+                    <span class="font-medium">{{ package.created_at|date:"M d, Y" }}</span>
+                </li>
+            </ul>
+
+            <h3 class="font-bold text-slate-900 mt-8 mb-4">Versions</h3>
+            <ul class="space-y-2">
+                {% for v in package.versions.all|slice:":5" %}
+                <li>
+                    <a href="#" class="flex justify-between text-sm text-slate-600 hover:text-aegis-600">
+                        <span>v{{ v.version }}</span>
+                        <span class="text-xs text-slate-400">{{ v.created_at|date:"M d" }}</span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
