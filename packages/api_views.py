@@ -8,7 +8,7 @@ from django.db.models import F
 from typing import Optional
 
 from .models import Package, PackageVersion, PackageFile, PackageOS, PackageArch
-from .serializers import PackageSerializer
+from .serializers import PackageSerializer, PackageUploadSerializer
 
 class PackageViewSet(viewsets.ModelViewSet):
     queryset = Package.objects.all()
@@ -17,69 +17,75 @@ class PackageViewSet(viewsets.ModelViewSet):
 
     parser_classes = (MultiPartParser, FormParser)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticatedOrReadOnly])
-    def publish(self, request: HttpRequest, name: Optional[str] = None) -> Response:
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def publish(self, request: HttpRequest) -> Response:
         """
-        Publie un nouveau fichier. Utilise PackageUploadSerializer pour valider les données.
+        Endpoint global de publication.
+        Crée le paquet s'il n'existe pas.
+        Ajoute une version s'il existe.
         """
-        package: Package = self.get_object()
-
-        # 1. Vérification Propriétaire
-        if package.author != request.user:
-            return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
-
-        # 2. VALIDATION VIA SERIALIZER
-        # On passe les données au serializer pour vérifier la taille, le format version, etc.
         serializer = PackageUploadSerializer(data=request.data)
-        
         if not serializer.is_valid():
-            # Si invalide, on renvoie les erreurs précises (ex: "File too large")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. Récupération des données propres et validées
-        version_num = serializer.validated_data['version']
-        archive_file = serializer.validated_data['file']
-        target_os = serializer.validated_data.get('os', PackageOS.ANY)
-        target_arch = serializer.validated_data.get('architecture', PackageArch.ANY)
-        
-        # 4. Gestion de la Version (Get or Create)
-        version, created = PackageVersion.objects.get_or_create(
-            package=package,
-            version_number=version_num
+        data = serializer.validated_data
+        package_name = data['name']
+
+        # 1. GET OR CREATE PACKAGE
+        # On essaie de récupérer le paquet, ou on le crée avec l'utilisateur courant comme auteur
+        package, created = Package.objects.get_or_create(
+            name=package_name,
+            defaults={
+                'author': request.user,
+                'description': data.get('description', '')
+            }
         )
-        
-        # Extraction du README (si nouvelle version ou readme vide)
-        if created or not version.readme:
-            readme_content = self._extract_readme_from_zip(archive_file)
+
+        # 2. VÉRIFICATION DE SÉCURITÉ
+        # Si le paquet existait déjà, on vérifie que c'est bien le bon auteur
+        if not created and package.author != request.user:
+            return Response(
+                {"error": f"You are not the author of '{package_name}'."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. GESTION DE LA VERSION (Identique à avant)
+        version, ver_created = PackageVersion.objects.get_or_create(
+            package=package,
+            version_number=data['version']
+        )
+
+        # Extraction README (si besoin)
+        if ver_created or not version.readme:
+            readme_content = self._extract_readme_from_zip(data['file'])
             if readme_content:
                 version.readme = readme_content
                 version.save()
-        
-        # 5. Vérification de conflit (Fichier déjà existant pour cet OS/Arch ?)
+
+        # 4. GESTION DU FICHIER (Identique à avant)
+        target_os = data.get('os', PackageOS.ANY)
+        target_arch = data.get('architecture', PackageArch.ANY)
+
         if PackageFile.objects.filter(version=version, os=target_os, architecture=target_arch).exists():
             return Response({
-                "error": f"File for OS '{target_os}' and Arch '{target_arch}' already exists in version {version_num}"
+                "error": f"File for {target_os}/{target_arch} already exists in v{data['version']}"
             }, status=status.HTTP_409_CONFLICT)
 
-        # 6. Création du fichier
         PackageFile.objects.create(
             version=version,
-            file=archive_file,
+            file=data['file'],
             os=target_os,
             architecture=target_arch
         )
         
-        # Mise à jour de la date de modification du paquet global
-        package.save() 
+        # Update timestamp
+        package.save()
 
-        msg = "Version created and file uploaded" if created else "File added to existing version"
-        
+        action_msg = "Package created and published" if created else "New version published"
         return Response({
-            "status": msg,
-            "version": version_num,
-            "os": target_os,
-            "arch": target_arch,
-            "readme_extracted": bool(version.readme)
+            "status": action_msg,
+            "package": package_name,
+            "version": data['version']
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=["get"])

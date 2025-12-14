@@ -59,10 +59,21 @@ class PackageUploadSerializer(serializers.Serializer):
     Serializer SPÉCIFIQUE pour l'action 'publish'.
     Il ne valide pas un modèle entier, mais les inputs de la commande CLI.
     """
+    name = serializers.SlugField(max_length=100)
+    description = serializers.CharField(required=False, allow_blank=True)
+
     version = serializers.CharField(max_length=20)
     file = serializers.FileField()
     os = serializers.CharField(required=False, default="any")
     architecture = serializers.CharField(required=False, default="any")
+
+    def validate_name(self, value):
+        value = value.lower().strip()
+        if not re.match(r'^[a-z0-9_]+$', value):
+            raise serializers.ValidationError("Invalid name format.")
+        if value in RESERVED_NAMES:
+            raise serializers.ValidationError(f"The name '{value}' is reserved.")
+        return value
 
     def validate_version(self, value):
         """Force le format SemVer (X.Y.Z)"""
