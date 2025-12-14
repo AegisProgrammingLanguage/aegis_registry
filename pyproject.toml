@@ -6,7 +6,7 @@ authors = ["ikigami0513 <ikigami0513@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.13"
 django = "^6.0"
 djangorestframework = "^3.16.1"
 django-cors-headers = "^4.9.0"
